@@ -1,0 +1,143 @@
+﻿<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+<title>轨迹显示</title>
+<script type="text/javascript"
+    src="http://api.map.baidu.com/api?v=1.0&type=webgl&ak=fwbNgv83oVvGk2htRx4zaaP2g5DVtQkq"></script>
+<script type="text/javascript" src="//api.map.baidu.com/library/TrackAnimation/src/TrackAnimation_min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<style type="text/css">
+    body,
+    html {
+        width: 115%;
+        height: 110%;
+        overflow: hidden;
+        margin: 0;
+        font-family: "微软雅黑";
+    }
+</style>
+</head>
+
+<body onload="theLocation()">
+    <div id="allmap" style="width: 80%;height: 80%;"></div>
+    <div id="r-result">
+        经度: <input id="longitude" type="text" style="width:100px; margin-right:10px;" />
+        纬度: <input id="latitude" type="text" style="width:100px; margin-right:10px;" />
+        <input type="button" value="查询" onclick="startAjaxRefresh()" />
+        <input type="button" value="关闭刷新" onclick="shutdownRefresh()" />
+        <input type="button" value="清除轨迹" onclick="cleanPl()" />
+        <input type="button" value="点迹显示" onclick="onlyPath()" />
+    </div>
+</body>
+
+</html>
+<script type="text/javascript">
+    var TimeInter = undefined
+    // 百度地图API功能
+    var map = new BMapGL.Map("allmap");
+    var fso, ts, s, t;
+    var ForReading = 1;
+    map.centerAndZoom(new BMapGL.Point(116.331398, 39.897445), 19);
+    map.enableScrollWheelZoom(true);
+    var path = [];//存储每次清除轨迹以后的点迹
+    var h_path = [];//用来存储通信建立以后的所有的历史轨迹
+    var pl;
+    var ONLYPATH = false
+
+
+
+    // 用经纬度设置地图中心点
+    function theLocation() {
+        map.clearOverlays();
+        var new_point = new BMapGL.Point(t, s);
+        var marker = new BMapGL.Marker(new_point);  // 创建标注
+        map.addOverlay(marker);              // 将标注添加到地图中
+        map.panTo(new_point);
+        document.getElementById("longitude").value = s;
+        document.getElementById("latitude").value = t;
+    }
+
+    //将点击函数设置成开启轮询
+    function startAjaxRefresh() {
+        //start_track()
+        clearInterval(TimeInter);
+        TimeInter = setInterval(() => { view_ajax() }, 3000)//三秒刷新一次
+        {#console.log('10s后开始执行')# }
+        {#setTimeout("start_track()", 10000)# }
+        {#console.log('执行完了')# }
+    }
+    //关闭轮询
+    function shutdownRefresh() {
+        clearInterval(TimeInter);//关掉定时器，确保每个定时器打开之前都关闭上一个定时器
+    }
+
+    //刷新展示与轮询
+    async function view_ajax() {
+        var json_data
+        var view_chart = document.getElementById('view_chart')
+        await $.ajax({
+            url: '/get/json_data',
+            success: function (data) {
+                json_data = data
+                //console.log(json_data['yin'])
+                //console.log(json_data['yang'])
+            }
+        }).then((json_data) => {
+            //map.clearOverlays();
+            const new_point = new BMapGL.Point(json_data['t'], json_data['s']);
+            path.push(new BMapGL.Point(json_data['t'], json_data['s']))
+            h_path.push(new BMapGL.Point(json_data['t'], json_data['s']))
+            pl = new BMapGL.Polyline(path, { strokeColor: "blue", strokeWeight: 6, strokeOpacity: 0.5 })
+            console.log('打印的pl', pl, path)
+            const marker = new BMapGL.Marker(new_point);  // 创建标注
+            if (!ONLYPATH) {
+                map.addOverlay(marker);              // 将标注添加到地图中
+                // 在点标记上添加数字（根据需求设置对应信息）
+                const label = new BMapGL.Label(path.length, {
+                    //调整数字跟点标记的位置关系
+                    offset: new BMapGL.Size(-6, -25),
+                });
+                label.setStyle({
+                    background: "none",
+                    color: "#fff",
+                    border: "none",
+                });
+                //对label的样式进行设置
+                marker.setLabel(label); //将label添加到marker上
+            }
+            map.addOverlay(pl)//绘制轨迹
+            map.panTo(new_point);
+            document.getElementById("longitude").value = json_data['t'];
+            document.getElementById("latitude").value = json_data['s'];
+        }
+        )
+    };
+
+    function cleanPl() {
+        map.clearOverlays()
+        path = []
+    }
+
+    function onlyPath() {
+        //map.clearOverlays()
+        if (ONLYPATH) {
+            ONLYPATH = false
+        }
+        else {
+            ONLYPATH = true
+        }
+
+    }
+
+    function start_track() {
+        trackAni = new BMapGLLib.TrackAnimation(map, pl, {
+            overallView: false,
+            tilt: 30,
+            duration: 2000,
+            delay: 100
+        });
+        trackAni.start();
+    }
+
+</script>
